@@ -8,7 +8,10 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"os/exec"
+	"strconv"
+	"strings"
 	"syscall"
 	"unsafe"
 
@@ -84,6 +87,40 @@ type LinuxPlatform struct {
 	pcap *packetCounter
 }
 
+// getKernelVersion reads /proc/sys/kernel/osrelease and parses the major and minor numbers.
+func getKernelVersion() (major, minor int, err error) {
+	data, err := os.ReadFile("/proc/sys/kernel/osrelease")
+	if err != nil {
+		return 0, 0, err
+	}
+	return parseKernelVersion(string(data))
+}
+
+// parseKernelVersion parses a release string (e.g. "3.10.0-1160.el7.x86_64") into major and minor numbers.
+func parseKernelVersion(release string) (major, minor int, err error) {
+	release = strings.TrimSpace(release)
+	parts := strings.Split(release, ".")
+	if len(parts) < 2 {
+		return 0, 0, fmt.Errorf("invalid kernel version string: %q", release)
+	}
+	major, err = strconv.Atoi(parts[0])
+	if err != nil {
+		return 0, 0, fmt.Errorf("parse kernel major: %w", err)
+	}
+	minorStr := parts[1]
+	for i, r := range minorStr {
+		if r < '0' || r > '9' {
+			minorStr = minorStr[:i]
+			break
+		}
+	}
+	minor, err = strconv.Atoi(minorStr)
+	if err != nil {
+		return 0, 0, fmt.Errorf("parse kernel minor: %w", err)
+	}
+	return major, minor, nil
+}
+
 // NewPlatform creates a new Linux platform collector.
 // It attempts netlink SOCK_DIAG first, then probes whether the kernel actually
 // supports INET_DIAG queries. If the inet_diag module is not available, it
@@ -91,13 +128,33 @@ type LinuxPlatform struct {
 func NewPlatform() (Platform, error) {
 	p := &LinuxPlatform{}
 
+	// Allow forcing /proc + AF_PACKET mode via environment variable
+	if os.Getenv("SSTOP_USE_PROC") == "1" {
+		log.Printf("sstop: SSTOP_USE_PROC=1 set, using /proc + AF_PACKET fallback")
+		p.useProc = true
+		p.pcap = newPacketCounter()
+		return p, nil
+	}
+
+	// Check kernel version: Linux < 4.1 struct tcp_info does not include
+	// tcpi_bytes_acked / tcpi_bytes_received (added in Linux 4.1/4.2).
+	// On older kernels (e.g. CentOS 7 / RHEL 7 with kernel 3.10), netlink INET_DIAG
+	// cannot provide socket byte counters, so we must enable AF_PACKET packet capture.
+	major, minor, err := getKernelVersion()
+	if err == nil && (major < 4 || (major == 4 && minor < 1)) {
+		log.Printf("sstop: Linux kernel %d.%d < 4.1 lacks tcp_info byte counters, enabling AF_PACKET fallback", major, minor)
+		p.pcap = newPacketCounter()
+	}
+
 	// NETLINK_SOCK_DIAG = 4
 	conn, err := netlink.Dial(4, nil)
 	if err != nil {
 		// Cannot even open the netlink socket -- fall back to /proc.
 		log.Printf("sstop: netlink dial failed, using /proc + AF_PACKET fallback: %v", err)
 		p.useProc = true
-		p.pcap = newPacketCounter()
+		if p.pcap == nil {
+			p.pcap = newPacketCounter()
+		}
 		return p, nil
 	}
 
@@ -125,7 +182,9 @@ func NewPlatform() (Platform, error) {
 		conn.Close()
 		log.Printf("sstop: netlink INET_DIAG unavailable, using /proc + AF_PACKET fallback: %v", probeErr)
 		p.useProc = true
-		p.pcap = newPacketCounter()
+		if p.pcap == nil {
+			p.pcap = newPacketCounter()
+		}
 		return p, nil
 	}
 
@@ -190,8 +249,8 @@ func (p *LinuxPlatform) Collect() ([]MappedSocket, []model.InterfaceStats, error
 		sockets, err = querySocketsFromProc()
 	} else {
 		sockets, err = p.queryAllSockets()
-		// If netlink fails at runtime (e.g. module unloaded), try /proc fallback
-		if err != nil && isNetlinkModuleError(err) {
+		// If netlink fails at runtime (e.g. module unloaded, legacy kernel issue), try /proc fallback
+		if err != nil {
 			log.Printf("sstop: netlink query failed at runtime, falling back to /proc + AF_PACKET: %v", err)
 			p.useProc = true
 			if p.conn != nil {
@@ -273,6 +332,10 @@ func (p *LinuxPlatform) queryAllSockets() ([]model.Socket, error) {
 	for _, af := range []uint8{afINET, afINET6} {
 		socks, err := p.querySockets(af, ipprotoTCP, model.ProtoTCP)
 		if err != nil {
+			// IPv6 may be disabled in kernel (e.g. ipv6.disable=1); non-fatal
+			if af == afINET6 {
+				continue
+			}
 			return nil, fmt.Errorf("query TCP af=%d: %w", af, err)
 		}
 		all = append(all, socks...)

@@ -32,6 +32,7 @@ jobs:
 
       - name: Build
         env:
+          CGO_ENABLED: 0
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: |
@@ -39,7 +40,7 @@ jobs:
           if [ "$GOOS" = "windows" ]; then
             binary_name="sstop.exe"
           fi
-          go build -ldflags="-s -w" -o "${binary_name}" .
+          go build -trimpath -ldflags="-s -w" -o "${binary_name}" .
           tar czf "sstop-${GOOS}-${GOARCH}.tar.gz" "${binary_name}"
 
       - uses: actions/upload-artifact@v4

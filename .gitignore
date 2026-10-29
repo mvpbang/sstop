@@ -1,3 +1,4 @@
 sstop
+sstop-*
 *.log
 /dist/

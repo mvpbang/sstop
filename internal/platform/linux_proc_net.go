@@ -48,8 +48,9 @@ func querySocketsFromProc() ([]model.Socket, error) {
 	for _, pf := range files {
 		socks, err := parseProcNetFile(pf.path, pf.family, pf.proto)
 		if err != nil {
-			// UDP files might not exist on some configs; TCP is required.
-			if pf.proto == model.ProtoUDP {
+			// UDP files or IPv6 files might not exist on some configs (e.g. ipv6.disable=1);
+			// only IPv4 TCP (/proc/net/tcp) is strictly required.
+			if pf.proto == model.ProtoUDP || pf.family == afINET6 {
 				continue
 			}
 			return nil, fmt.Errorf("parse %s: %w", pf.path, err)

@@ -48,6 +48,30 @@ Real-time, per-process network bandwidth monitor for the terminal. Think `htop` 
 
 ## Installation
 
+### building
+```
+# 1. 一键构建 CentOS 7 / RHEL 7 专用的纯静态 amd64 二进制文件
+make centos7
+# 2. 本机架构构建（带 -trimpath 与 -ldflags="-s -w" 优化）
+make build
+# 3. 本机全静态构建（CGO_ENABLED=0）
+make build-static
+# 4. 单独交叉编译指定平台
+make linux-amd64    # 输出到 dist/sstop-linux-amd64
+make linux-arm64    # 输出到 dist/sstop-linux-arm64
+make darwin-arm64   # 输出到 dist/sstop-darwin-arm64
+make darwin-amd64   # 输出到 dist/sstop-darwin-amd64
+# 5. 一键多平台发布打包（自动生成 tar.gz 压缩包及 SHA-256 checksums.txt）
+make dist
+# 6. 运行测试
+make test           # 运行全套单元测试
+make test-linux     # 针对 Linux 平台编译并验证平台代码
+# 7. 清理构建产物与临时文件
+make clean
+# 8. 查看所有支持的目标和说明
+make help
+```
+
 ### From releases
 
 Download the latest binary from [Releases](https://github.com/googlesky/sstop/releases):

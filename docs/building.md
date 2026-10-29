@@ -7,6 +7,21 @@
 
 ## Build
 
+Using Make:
+
+```bash
+# Build for host OS
+make build
+
+# Build static binary for CentOS 7 / legacy Linux
+make centos7
+
+# See all make targets
+make help
+```
+
+Or using `go build` directly:
+
 ```bash
 git clone https://github.com/googlesky/sstop.git
 cd sstop
@@ -15,19 +30,17 @@ go build -o sstop .
 
 ## Cross-Compile
 
+Using Make:
+
 ```bash
-# Linux amd64
-GOOS=linux GOARCH=amd64 go build -o sstop-linux-amd64 .
-
-# Linux arm64
-GOOS=linux GOARCH=arm64 go build -o sstop-linux-arm64 .
-
-# macOS Apple Silicon
-GOOS=darwin GOARCH=arm64 go build -o sstop-darwin-arm64 .
-
-# macOS Intel
-GOOS=darwin GOARCH=amd64 go build -o sstop-darwin-amd64 .
+make linux-amd64   # Linux amd64 (static)
+make linux-arm64   # Linux arm64 (static)
+make darwin-arm64  # macOS Apple Silicon
+make darwin-amd64  # macOS Intel
+make dist          # Package all platforms with tar.gz + checksums
 ```
+
+Or manually:
 
 ## Install
 
