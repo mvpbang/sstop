@@ -7,14 +7,17 @@
 
 ## Build
 
-Using Make:
+Using Make (all build artifacts are placed in `dist/`):
 
 ```bash
-# Build for host OS
+# Build for host OS (outputs to dist/sstop)
 make build
 
-# Build static binary for CentOS 7 / legacy Linux
+# Build static binary for CentOS 7 / legacy Linux (outputs to dist/sstop-centos7)
 make centos7
+
+# Build static binary for host OS (outputs to dist/sstop)
+make build-static
 
 # See all make targets
 make help
@@ -25,7 +28,7 @@ Or using `go build` directly:
 ```bash
 git clone https://github.com/googlesky/sstop.git
 cd sstop
-go build -o sstop .
+mkdir -p dist && go build -trimpath -ldflags="-s -w" -o dist/sstop .
 ```
 
 ## Cross-Compile

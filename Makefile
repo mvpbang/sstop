@@ -25,15 +25,18 @@ help: ## Display this help screen
 	@echo "Targets:"
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z0-9_-]+:.*?## / {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-build: ## Build binary for the current host OS and architecture
-	$(GO) build $(BUILD_FLAGS) -o $(BINARY_NAME) .
+build: ## Build binary for the current host OS and architecture (outputs to dist/)
+	@mkdir -p $(DIST_DIR)
+	$(GO) build $(BUILD_FLAGS) -o $(DIST_DIR)/$(BINARY_NAME) .
 
-build-static: ## Build completely statically linked binary (CGO_ENABLED=0)
-	CGO_ENABLED=0 $(GO) build $(BUILD_FLAGS) -o $(BINARY_NAME) .
+build-static: ## Build completely statically linked binary (CGO_ENABLED=0, outputs to dist/)
+	@mkdir -p $(DIST_DIR)
+	CGO_ENABLED=0 $(GO) build $(BUILD_FLAGS) -o $(DIST_DIR)/$(BINARY_NAME) .
 
-centos7: ## Build statically linked Linux amd64 binary for CentOS 7 / RHEL 7
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GO) build $(BUILD_FLAGS) -o $(BINARY_NAME) .
-	@echo "Built CentOS 7 binary: $(BINARY_NAME)"
+centos7: ## Build statically linked Linux amd64 binary for CentOS 7 / RHEL 7 (outputs to dist/)
+	@mkdir -p $(DIST_DIR)
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GO) build $(BUILD_FLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-centos7 .
+	@echo "Built CentOS 7 binary: $(DIST_DIR)/$(BINARY_NAME)-centos7"
 
 linux-amd64: ## Cross-compile for Linux amd64 (static)
 	@mkdir -p $(DIST_DIR)

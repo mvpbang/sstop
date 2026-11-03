@@ -48,27 +48,37 @@ Real-time, per-process network bandwidth monitor for the terminal. Think `htop` 
 
 ## Installation
 
-### building
-```
-# 1. 一键构建 CentOS 7 / RHEL 7 专用的纯静态 amd64 二进制文件
+### 源码编译 (Building from Source)
+
+使用 `make` 编译，所有构建产物均统一输出至 `dist/` 目录：
+
+```bash
+# 构建 CentOS 7 / RHEL 7 专用的纯静态 amd64 二进制文件（输出至 dist/sstop-centos7）
 make centos7
-# 2. 本机架构构建（带 -trimpath 与 -ldflags="-s -w" 优化）
+
+# 构建当前系统架构的二进制文件（输出至 dist/sstop，附带 -trimpath 与 -ldflags="-s -w" 优化）
 make build
-# 3. 本机全静态构建（CGO_ENABLED=0）
+
+# 构建当前系统的纯静态二进制文件（CGO_ENABLED=0，输出至 dist/sstop）
 make build-static
-# 4. 单独交叉编译指定平台
-make linux-amd64    # 输出到 dist/sstop-linux-amd64
-make linux-arm64    # 输出到 dist/sstop-linux-arm64
-make darwin-arm64   # 输出到 dist/sstop-darwin-arm64
-make darwin-amd64   # 输出到 dist/sstop-darwin-amd64
-# 5. 一键多平台发布打包（自动生成 tar.gz 压缩包及 SHA-256 checksums.txt）
+
+# 交叉编译指定平台架构（输出至 dist/ 目录）
+make linux-amd64    # dist/sstop-linux-amd64
+make linux-arm64    # dist/sstop-linux-arm64
+make darwin-arm64   # dist/sstop-darwin-arm64
+make darwin-amd64   # dist/sstop-darwin-amd64
+
+# 多平台发布打包（自动在 dist/ 生成各平台 tar.gz 压缩包及 SHA-256 checksums.txt）
 make dist
-# 6. 运行测试
+
+# 运行测试
 make test           # 运行全套单元测试
 make test-linux     # 针对 Linux 平台编译并验证平台代码
-# 7. 清理构建产物与临时文件
+
+# 清理构建产物与临时文件（清理 dist/ 及临时产物）
 make clean
-# 8. 查看所有支持的目标和说明
+
+# 查看 Makefile 支持的所有目标与使用说明
 make help
 ```
 
@@ -107,7 +117,7 @@ Or build manually:
 ```bash
 git clone https://github.com/googlesky/sstop.git
 cd sstop
-go build -o sstop .
+mkdir -p dist && go build -trimpath -ldflags="-s -w" -o dist/sstop .
 ```
 
 ## Usage
@@ -173,9 +183,9 @@ sudo setcap cap_net_raw+ep ./sstop
 
 sstop uses a tiered approach for maximum compatibility:
 
-1. **Netlink SOCK_DIAG** (preferred) — queries the kernel directly for all TCP/UDP sockets with per-connection byte counters from `tcp_info`. Fastest and most accurate.
+1. **Netlink SOCK_DIAG** (preferred on Linux 4.1+) — queries the kernel directly for all TCP/UDP sockets with per-connection byte counters from `tcp_info`. Fastest and most accurate.
 
-2. **`/proc/net` + AF_PACKET** (fallback) — when the `inet_diag` kernel module is unavailable (common on minimal/custom kernels), sstop falls back to parsing `/proc/net/{tcp,tcp6,udp,udp6}` for socket enumeration and opens an AF_PACKET raw socket to track per-connection bandwidth at the packet level.
+2. **`/proc/net` + AF_PACKET** (fallback) — when the `inet_diag` kernel module is unavailable (common on minimal/custom kernels), or on legacy kernels (< 4.1, such as CentOS 7 with Linux 3.10) where `tcp_info` lacks byte counters, sstop automatically falls back to parsing `/proc/net/{tcp,tcp6,udp,udp6}` for socket enumeration and opens an AF_PACKET raw socket to track per-connection bandwidth at the packet level. Can also be forced via `SSTOP_USE_PROC=1`.
 
 Process-to-socket mapping is done by scanning `/proc/<pid>/fd/` for socket inodes. Interface stats come from `/proc/net/dev`.
 
